@@ -3,6 +3,7 @@ import pandas as pd
 import plotly.express as px
 import requests
 import os
+from datetime import datetime
 
 st.set_page_config(page_title="SentinelFinance", page_icon="📊", layout="wide")
 
@@ -12,14 +13,22 @@ st.markdown("# 📊 SentinelFinance")
 st.markdown("**Real-time Indian Political & Corporate Sentiment → Market Intelligence**")
 st.markdown("---")
 
-API_KEY = "87a13b1be1a34e0dbd3f4b86d4b3705e"
-
 @st.cache_data(ttl=300)
 def fetch_live_news():
-    url = "https://newsapi.org/v2/everything"
-    params = {"q": "RBI Governor OR Modi economy OR Adani OR Ambani", "apiKey": API_KEY, "pageSize": 20, "language": "en"}
-    r = requests.get(url, params=params)
-    return r.json().get("articles", [])
+    import feedparser, urllib.parse
+    query = "RBI Governor OR Modi economy OR Adani OR Ambani"
+    url = f"https://news.google.com/rss/search?q={urllib.parse.quote(query)}&hl=en-IN&gl=IN&ceid=IN:en"
+    feed = feedparser.parse(url)
+    articles = []
+    for e in feed.entries[:20]:
+        title = e.title.rsplit(" - ", 1)[0] if " - " in e.title else e.title
+        source = e.title.rsplit(" - ", 1)[-1] if " - " in e.title else "Google News"
+        try:
+            date = e.published[:10]
+        except:
+            date = datetime.now().strftime("%Y-%m-%d")
+        articles.append({"title": title, "source": {"name": source}, "publishedAt": date, "url": ""})
+    return articles
 
 articles = fetch_live_news()
 
