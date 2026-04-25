@@ -3,8 +3,9 @@ import feedparser
 import pandas as pd
 import plotly.graph_objects as go
 import re
-from datetime import datetime
 import zoneinfo
+import yfinance as yf
+from datetime import datetime
 
 st.set_page_config(page_title="Netunim | Indian Market Sentiment", page_icon="📡", layout="wide", initial_sidebar_state="collapsed")
 
@@ -79,9 +80,23 @@ def parse_date(entry):
         if val:
             try:
                 return datetime(*entry.published_parsed[:6]).strftime("%d %b %H:%M")
-            except Exception:
+            except:
                 return val[:16]
     return "—"
+
+def fetch_market_prices():
+    try:
+        nifty = yf.Ticker("^NSEI")
+        sensex = yf.Ticker("^BSESN")
+        nifty_price = round(nifty.fast_info['lastPrice'], 2)
+        sensex_price = round(sensex.fast_info['lastPrice'], 2)
+        nifty_prev = round(nifty.fast_info['previousClose'], 2)
+        sensex_prev = round(sensex.fast_info['previousClose'], 2)
+        nifty_chg = round(((nifty_price - nifty_prev) / nifty_prev) * 100, 2)
+        sensex_chg = round(((sensex_price - sensex_prev) / sensex_prev) * 100, 2)
+        return nifty_price, nifty_chg, sensex_price, sensex_chg
+    except:
+        return None, None, None, None
 
 @st.cache_data(ttl=180)
 def fetch_all_news():
@@ -97,7 +112,7 @@ def fetch_all_news():
                 sentiment, score = score_sentiment(clean)
                 entities = extract_entities(clean)
                 articles.append({"headline": title[:140], "source": source, "date": parse_date(entry), "link": getattr(entry, "link", "#"), "sentiment": sentiment, "score": score, "entities": entities})
-        except Exception:
+        except:
             continue
     return articles
 
@@ -119,42 +134,27 @@ def compute_signal(articles):
 
 def make_gauge(avg_score):
     fig = go.Figure(go.Indicator(
-        mode="gauge+number",
-        value=round(avg_score * 100, 1),
+        mode="gauge+number", value=round(avg_score * 100, 1),
         domain={"x": [0, 1], "y": [0, 1]},
         title={"text": "Sentiment Index", "font": {"color": "#888899", "size": 13, "family": "Space Mono"}},
-        number={"suffix": "", "font": {"color": "#e8e8f0", "size": 28, "family": "Space Mono"}},
-        gauge={
-            "axis": {"range": [-100, 100], "tickfont": {"color": "#444466", "size": 10}},
-            "bar": {"color": "#00ff88" if avg_score >= 0 else "#ff6b6b", "thickness": 0.3},
-            "bgcolor": "#13131e",
-            "borderwidth": 0,
-            "steps": [
-                {"range": [-100, -30], "color": "#2b0d0d"},
-                {"range": [-30, 30], "color": "#13131e"},
-                {"range": [30, 100], "color": "#0d2b1a"},
-            ],
-        }
+        number={"font": {"color": "#e8e8f0", "size": 28, "family": "Space Mono"}},
+        gauge={"axis": {"range": [-100, 100]}, "bar": {"color": "#00ff88" if avg_score >= 0 else "#ff6b6b", "thickness": 0.3}, "bgcolor": "#13131e", "borderwidth": 0,
+               "steps": [{"range": [-100, -30], "color": "#2b0d0d"}, {"range": [-30, 30], "color": "#13131e"}, {"range": [30, 100], "color": "#0d2b1a"}]}
     ))
     fig.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", height=220, margin=dict(l=20, r=20, t=40, b=10))
     return fig
 
 def make_donut(bull, bear, neut):
     fig = go.Figure(go.Pie(
-        labels=["Bullish", "Bearish", "Neutral"],
-        values=[bull, bear, neut],
-        hole=0.65,
+        labels=["Bullish", "Bearish", "Neutral"], values=[bull, bear, neut], hole=0.65,
         marker=dict(colors=["#00ff88", "#ff6b6b", "#444466"]),
         textfont=dict(family="Space Mono", size=11, color="#e8e8f0"),
         hovertemplate="%{label}: %{value} articles<extra></extra>",
     ))
-    fig.update_layout(
-        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-        showlegend=True,
+    fig.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", showlegend=True,
         legend=dict(font=dict(color="#888899", size=10, family="Space Mono"), bgcolor="rgba(0,0,0,0)"),
         height=220, margin=dict(l=10, r=10, t=10, b=10),
-        annotations=[dict(text=f"<b>{bull+bear+neut}</b><br>articles", x=0.5, y=0.5, font_size=16, showarrow=False, font=dict(color="#e8e8f0", family="Space Mono"))]
-    )
+        annotations=[dict(text=f"<b>{bull+bear+neut}</b><br>articles", x=0.5, y=0.5, font_size=16, showarrow=False, font=dict(color="#e8e8f0", family="Space Mono"))])
     return fig
 
 def make_timeline(articles):
@@ -162,21 +162,16 @@ def make_timeline(articles):
     fig = go.Figure()
     for sentiment, color in [("BULLISH", "#00ff88"), ("BEARISH", "#ff6b6b"), ("NEUTRAL", "#6666aa")]:
         sub = df[df["sentiment"] == sentiment]
-        fig.add_trace(go.Scatter(
-            x=list(range(len(sub))), y=sub["score"].tolist(),
-            mode="markers", name=sentiment,
+        fig.add_trace(go.Scatter(x=list(range(len(sub))), y=sub["score"].tolist(), mode="markers", name=sentiment,
             marker=dict(color=color, size=8, opacity=0.8),
             hovertemplate="<b>%{customdata}</b><br>Score: %{y:.3f}<extra></extra>",
-            customdata=sub["headline"].str[:60].tolist(),
-        ))
+            customdata=sub["headline"].str[:60].tolist()))
     fig.add_hline(y=0, line_dash="dot", line_color="#333355", line_width=1)
-    fig.update_layout(
-        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+    fig.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
         xaxis=dict(showgrid=False, showticklabels=False, zeroline=False),
         yaxis=dict(gridcolor="#1e1e35", color="#444466", tickfont=dict(family="Space Mono", size=9)),
         legend=dict(font=dict(color="#888899", size=10, family="Space Mono"), bgcolor="rgba(0,0,0,0)"),
-        height=180, margin=dict(l=40, r=20, t=10, b=10),
-    )
+        height=180, margin=dict(l=40, r=20, t=10, b=10))
     return fig
 
 def main():
@@ -206,8 +201,22 @@ def main():
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    col_sig, col_gauge, col_donut = st.columns([1.2, 1, 1])
+    nifty_price, nifty_chg, sensex_price, sensex_chg = fetch_market_prices()
+    pc1, pc2 = st.columns(2)
+    with pc1:
+        if nifty_price:
+            color = "#00ff88" if nifty_chg >= 0 else "#ff6b6b"
+            arrow = "▲" if nifty_chg >= 0 else "▼"
+            st.markdown(f'<div class="metric-box"><div class="metric-val" style="color:{color}">₹{nifty_price:,}</div><div class="metric-label">NIFTY 50 {arrow} {nifty_chg}%</div></div>', unsafe_allow_html=True)
+    with pc2:
+        if sensex_price:
+            color2 = "#00ff88" if sensex_chg >= 0 else "#ff6b6b"
+            arrow2 = "▲" if sensex_chg >= 0 else "▼"
+            st.markdown(f'<div class="metric-box"><div class="metric-val" style="color:{color2}">₹{sensex_price:,}</div><div class="metric-label">SENSEX {arrow2} {sensex_chg}%</div></div>', unsafe_allow_html=True)
 
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    col_sig, col_gauge, col_donut = st.columns([1.2, 1, 1])
     with col_sig:
         signal_classes = {
             "BULLISH": ("signal-bullish", "📈 BULLISH", "Momentum favors buyers. Watch for breakout setups on Nifty/Sensex."),
@@ -215,11 +224,14 @@ def main():
             "NEUTRAL": ("signal-neutral", "⏸ NEUTRAL", "Mixed signals. Wait for direction. Avoid overexposure."),
         }
         css_class, label, advice = signal_classes[signal]
+        top_headlines = [a["headline"] for a in articles if a["sentiment"] == signal][:3]
+        driven_by = " · ".join([h[:50] for h in top_headlines]) if top_headlines else "Mixed signals"
         st.markdown(f"""
         <div class="signal-card {css_class}">
             <div class="signal-label">{label}</div>
-            <div style="font-size:0.8rem; margin-bottom:0.8rem; opacity:0.85;">{advice}</div>
-            <div style="opacity:0.6; font-size:0.72rem;">TRADE SIGNAL · AUTO-GENERATED</div>
+            <div style="font-size:0.8rem; margin-bottom:0.5rem; opacity:0.85;">{advice}</div>
+            <div style="font-size:0.7rem; opacity:0.6; margin-bottom:0.5rem;">DRIVEN BY: {driven_by}</div>
+            <div style="opacity:0.5; font-size:0.68rem;">TRADE SIGNAL · AUTO-GENERATED · NOT FINANCIAL ADVICE</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -234,7 +246,6 @@ def main():
 
     with col_gauge:
         st.plotly_chart(make_gauge(avg_score), use_container_width=True, config={"displayModeBar": False})
-
     with col_donut:
         st.plotly_chart(make_donut(bull, bear, neut), use_container_width=True, config={"displayModeBar": False})
 
@@ -242,12 +253,11 @@ def main():
     st.plotly_chart(make_timeline(articles), use_container_width=True, config={"displayModeBar": False})
 
     st.markdown('<hr class="section-divider"><div class="section-title">Live News Feed</div>', unsafe_allow_html=True)
-
     filter_col1, filter_col2 = st.columns([1, 2])
     with filter_col1:
-        sentiment_filter = st.selectbox("Filter by sentiment", ["ALL", "BULLISH", "BEARISH", "NEUTRAL"], label_visibility="collapsed")
+        sentiment_filter = st.selectbox("Filter", ["ALL", "BULLISH", "BEARISH", "NEUTRAL"], label_visibility="collapsed")
     with filter_col2:
-        source_filter = st.selectbox("Filter by source", ["ALL SOURCES"] + list(FEEDS.keys()), label_visibility="collapsed")
+        source_filter = st.selectbox("Source", ["ALL SOURCES"] + list(FEEDS.keys()), label_visibility="collapsed")
 
     filtered = articles
     if sentiment_filter != "ALL":
