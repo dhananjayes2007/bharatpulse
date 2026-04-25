@@ -143,15 +143,18 @@ def fetch_all_news():
         except:
             continue
 
-    texts = [a["clean"][:512] for a in raw_articles]
-    finbert_results = finbert_sentiment(texts)
-
-    for i, art in enumerate(raw_articles):
-        if finbert_results and i < len(finbert_results):
-            sentiment, score = finbert_results[i]
-        else:
+    import time
+    for art in raw_articles:
+        try:
+            result = finbert_sentiment([art["clean"][:512]])
+            if result and len(result) > 0:
+                sentiment, score = result[0]
+            else:
+                sentiment, score = score_sentiment(art["clean"])
+        except:
             sentiment, score = score_sentiment(art["clean"])
         articles.append({"headline": art["headline"], "source": art["source"], "date": art["date"], "link": art["link"], "entities": art["entities"], "sentiment": sentiment, "score": score})
+        time.sleep(0.3)
 
     return articles
 
