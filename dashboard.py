@@ -55,6 +55,34 @@ KEYWORDS_BULLISH = ["surge","rally","gain","bull","growth","profit","record","ri
 KEYWORDS_BEARISH = ["fall","drop","crash","bear","loss","sell","decline","plunge","weak","negative","miss","downgrade","underperform","low","recession","inflation","crisis","concern","risk","warning","outflow","FII selling","rate hike","slump","correction","volatility","tension","ban","fine","fraud"]
 KEYWORDS_ENTITIES = ["Nifty","Sensex","NSE","BSE","RBI","SEBI","Modi","Ambani","Adani","TCS","Infosys","Reliance","HDFC","SBI","Wipro","Bajaj","Tata","budget","FII","DII","rupee","crude","gold"]
 
+
+HF_TOKEN = st.secrets.get("HF_TOKEN", "")
+HF_API_URL = "https://api-inference.huggingface.co/pipeline/text-classification/ProsusAI/finbert"
+
+def finbert_sentiment(texts):
+    try:
+        import requests as req
+        headers = {"Authorization": f"Bearer {HF_TOKEN}"}
+        response = req.post(HF_API_URL, headers=headers, json={"inputs": texts}, timeout=15)
+        results = response.json()
+        sentiments = []
+        for r in results:
+            if isinstance(r, list):
+                top = max(r, key=lambda x: x["score"])
+                label = top["label"].upper()
+                score = top["score"]
+                if label == "POSITIVE":
+                    sentiments.append(("BULLISH", round(score, 3)))
+                elif label == "NEGATIVE":
+                    sentiments.append(("BEARISH", round(-score, 3)))
+                else:
+                    sentiments.append(("NEUTRAL", 0.0))
+            else:
+                sentiments.append(("NEUTRAL", 0.0))
+        return sentiments
+    except:
+        return None
+
 def score_sentiment(text):
     text_lower = text.lower()
     bull_hits = sum(1 for w in KEYWORDS_BULLISH if w in text_lower)
@@ -111,7 +139,7 @@ def fetch_all_news():
                 clean = re.sub(r"<[^>]+>", " ", full_text)
                 sentiment, score = score_sentiment(clean)
                 entities = extract_entities(clean)
-                articles.append({"headline": title[:140], "source": source, "date": parse_date(entry), "link": getattr(entry, "link", "#"), "sentiment": sentiment, "score": score, "entities": entities})
+                articles.append({"headline": title[:140], "source": source, "date": parse_date(entry), "link": getattr(entry, "link", "#"), "sentiment": sentiment, "score": score, "entities": entities, "clean": clean})
         except:
             continue
     return articles
