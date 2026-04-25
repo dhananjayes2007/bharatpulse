@@ -129,6 +129,7 @@ def fetch_market_prices():
 @st.cache_data(ttl=180)
 def fetch_all_news():
     articles = []
+    raw_articles = []
     for source, url in FEEDS.items():
         try:
             feed = feedparser.parse(url)
@@ -137,11 +138,21 @@ def fetch_all_news():
                 summary = getattr(entry, "summary", "")
                 full_text = f"{title} {summary}"
                 clean = re.sub(r"<[^>]+>", " ", full_text)
-                sentiment, score = score_sentiment(clean)
                 entities = extract_entities(clean)
-                articles.append({"headline": title[:140], "source": source, "date": parse_date(entry), "link": getattr(entry, "link", "#"), "sentiment": sentiment, "score": score, "entities": entities, "clean": clean})
+                raw_articles.append({"headline": title[:140], "source": source, "date": parse_date(entry), "link": getattr(entry, "link", "#"), "entities": entities, "clean": clean})
         except:
             continue
+
+    texts = [a["clean"][:512] for a in raw_articles]
+    finbert_results = finbert_sentiment(texts)
+
+    for i, art in enumerate(raw_articles):
+        if finbert_results and i < len(finbert_results):
+            sentiment, score = finbert_results[i]
+        else:
+            sentiment, score = score_sentiment(art["clean"])
+        articles.append({"headline": art["headline"], "source": art["source"], "date": art["date"], "link": art["link"], "entities": art["entities"], "sentiment": sentiment, "score": score})
+
     return articles
 
 def compute_signal(articles):
