@@ -4,6 +4,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import re
 from datetime import datetime
+import zoneinfo
 
 st.set_page_config(page_title="Netunim | Indian Market Sentiment", page_icon="📡", layout="wide", initial_sidebar_state="collapsed")
 
@@ -195,7 +196,7 @@ def main():
 
     signal, bull, bear, neut = compute_signal(articles)
     avg_score = sum(a["score"] for a in articles) / len(articles)
-    now = datetime.now().strftime("%d %b %Y · %H:%M IST")
+    now = datetime.now(zoneinfo.ZoneInfo("Asia/Kolkata")).strftime("%d %b %Y · %H:%M IST")
 
     st.markdown(f"""
     <div class="ticker-wrap">
