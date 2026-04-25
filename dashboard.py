@@ -82,7 +82,7 @@ def parse_date(entry):
                 return val[:16]
     return "—"
 
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=180)
 def fetch_all_news():
     articles = []
     for source, url in FEEDS.items():
