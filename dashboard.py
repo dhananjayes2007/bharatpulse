@@ -133,7 +133,7 @@ def fetch_all_news():
     for source, url in FEEDS.items():
         try:
             feed = feedparser.parse(url)
-            for entry in feed.entries[:8]:
+            for entry in feed.entries[:4]:
                 title = getattr(entry, "title", "")
                 summary = getattr(entry, "summary", "")
                 full_text = f"{title} {summary}"
