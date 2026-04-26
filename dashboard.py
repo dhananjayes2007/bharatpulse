@@ -43,13 +43,23 @@ html, body, [class*="css"] { font-family: 'Syne', sans-serif; background-color: 
 
 FEEDS = {
     "Economic Times Markets": "https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms",
+    "ET Stocks": "https://economictimes.indiatimes.com/markets/stocks/rssfeeds/2146842.cms",
     "Business Standard Markets": "https://www.business-standard.com/rss/markets-106.rss",
-    "Moneycontrol News": "https://www.moneycontrol.com/rss/latestnews.xml",
+    "Moneycontrol Markets": "https://www.moneycontrol.com/rss/marketreports.xml",
     "LiveMint Markets": "https://www.livemint.com/rss/markets",
-    "NSE/BSE – Google News": "https://news.google.com/rss/search?q=NSE+BSE+India+stock+market&hl=en-IN&gl=IN&ceid=IN:en",
-    "RBI India – Google News": "https://news.google.com/rss/search?q=RBI+India+monetary+policy&hl=en-IN&gl=IN&ceid=IN:en",
-    "India Budget Economy": "https://news.google.com/rss/search?q=India+economy+budget+GDP&hl=en-IN&gl=IN&ceid=IN:en",
+    "Nifty Sensex": "https://news.google.com/rss/search?q=Nifty+Sensex+India+stock&hl=en-IN&gl=IN&ceid=IN:en",
+    "RBI SEBI": "https://news.google.com/rss/search?q=RBI+SEBI+Indian+market&hl=en-IN&gl=IN&ceid=IN:en",
+    "Dalal Street": "https://news.google.com/rss/search?q=Dalal+Street+BSE+NSE+India&hl=en-IN&gl=IN&ceid=IN:en",
 }
+
+INDIA_TERMS = ["nifty","sensex","bse","nse","rbi","sebi","india","indian","rupee","mumbai","dalal","crore","lakh","inr","sebi","ipo","fii","dii"]
+US_ONLY = ["s&p 500","nasdaq composite","dow jones","wall street","nyse","federal reserve","us stocks","american stocks","s&p500"]
+
+def is_india_relevant(text):
+    t = text.lower()
+    if not any(i in t for i in INDIA_TERMS):
+        return False
+    return True
 
 KEYWORDS_BULLISH = ["surge","rally","gain","bull","growth","profit","record","rise","jump","boost","positive","strong","beat","upgrade","buy","outperform","high","revenue","expansion","recovery","green","up","advance","buoyant","momentum","inflow","rate cut","stimulus"]
 KEYWORDS_BEARISH = ["fall","drop","crash","bear","loss","sell","decline","plunge","weak","negative","miss","downgrade","underperform","low","recession","inflation","crisis","concern","risk","warning","outflow","rate hike","slump","correction","volatility","tension","ban","fine","fraud"]
@@ -134,7 +144,8 @@ def fetch_all_news():
                 clean = re.sub(r"<[^>]+>", " ", f"{title} {summary}")
                 sentiment, score = get_sentiment(clean)
                 entities = extract_entities(clean)
-                articles.append({"headline": title[:140], "source": source, "date": parse_date(entry), "link": getattr(entry, "link", "#"), "sentiment": sentiment, "score": score, "entities": entities})
+                if is_india_relevant(clean):
+                    articles.append({"headline": title[:140], "source": source, "date": parse_date(entry), "link": getattr(entry, "link", "#"), "sentiment": sentiment, "score": score, "entities": entities})
                 time.sleep(0.2)
         except:
             continue
