@@ -51,39 +51,28 @@ FEEDS = {
     "India Budget Economy": "https://news.google.com/rss/search?q=India+economy+budget+GDP&hl=en-IN&gl=IN&ceid=IN:en",
 }
 
-KEYWORDS_BULLISH = ["surge","rally","gain","bull","growth","profit","record","rise","jump","boost","positive","strong","beat","upgrade","buy","outperform","high","revenue","expansion","recovery","green","up","advance","buoyant","momentum","inflow","FII buying","rate cut","stimulus"]
-KEYWORDS_BEARISH = ["fall","drop","crash","bear","loss","sell","decline","plunge","weak","negative","miss","downgrade","underperform","low","recession","inflation","crisis","concern","risk","warning","outflow","FII selling","rate hike","slump","correction","volatility","tension","ban","fine","fraud"]
+KEYWORDS_BULLISH = ["surge","rally","gain","bull","growth","profit","record","rise","jump","boost","positive","strong","beat","upgrade","buy","outperform","high","revenue","expansion","recovery","green","up","advance","buoyant","momentum","inflow","rate cut","stimulus"]
+KEYWORDS_BEARISH = ["fall","drop","crash","bear","loss","sell","decline","plunge","weak","negative","miss","downgrade","underperform","low","recession","inflation","crisis","concern","risk","warning","outflow","rate hike","slump","correction","volatility","tension","ban","fine","fraud"]
 KEYWORDS_ENTITIES = ["Nifty","Sensex","NSE","BSE","RBI","SEBI","Modi","Ambani","Adani","TCS","Infosys","Reliance","HDFC","SBI","Wipro","Bajaj","Tata","budget","FII","DII","rupee","crude","gold"]
 
-
 HF_TOKEN = st.secrets.get("HF_TOKEN", "")
-HF_API_URL = "https://api-inference.huggingface.co/pipeline/text-classification/ProsusAI/finbert"
 
-def finbert_sentiment(texts):
+def finbert_sentiment(text):
     try:
-        import requests as req
-        headers = {"Authorization": f"Bearer {HF_TOKEN}"}
-        response = req.post(HF_API_URL, headers=headers, json={"inputs": texts}, timeout=15)
-        results = response.json()
-        sentiments = []
-        for r in results:
-            if isinstance(r, list):
-                top = max(r, key=lambda x: x["score"])
-                label = top["label"].upper()
-                score = top["score"]
-                if label == "POSITIVE":
-                    sentiments.append(("BULLISH", round(score, 3)))
-                elif label == "NEGATIVE":
-                    sentiments.append(("BEARISH", round(-score, 3)))
-                else:
-                    sentiments.append(("NEUTRAL", 0.0))
-            else:
-                sentiments.append(("NEUTRAL", 0.0))
-        return sentiments
+        from huggingface_hub import InferenceClient
+        client = InferenceClient(provider="hf-inference", api_key=HF_TOKEN)
+        results = client.text_classification(text[:512], model="ProsusAI/finbert")
+        top = max(results, key=lambda x: x.score)
+        if top.label == "positive":
+            return ("BULLISH", round(top.score, 3))
+        elif top.label == "negative":
+            return ("BEARISH", round(-top.score, 3))
+        else:
+            return ("NEUTRAL", 0.0)
     except:
         return None
 
-def score_sentiment(text):
+def score_sentiment_keywords(text):
     text_lower = text.lower()
     bull_hits = sum(1 for w in KEYWORDS_BULLISH if w in text_lower)
     bear_hits = sum(1 for w in KEYWORDS_BEARISH if w in text_lower)
@@ -97,6 +86,12 @@ def score_sentiment(text):
         return "BEARISH", round(raw, 3)
     else:
         return "NEUTRAL", round(raw, 3)
+
+def get_sentiment(text):
+    result = finbert_sentiment(text)
+    if result:
+        return result
+    return score_sentiment_keywords(text)
 
 def extract_entities(text):
     found = [e for e in KEYWORDS_ENTITIES if e.lower() in text.lower()]
@@ -128,34 +123,21 @@ def fetch_market_prices():
 
 @st.cache_data(ttl=180)
 def fetch_all_news():
+    import time
     articles = []
-    raw_articles = []
     for source, url in FEEDS.items():
         try:
             feed = feedparser.parse(url)
             for entry in feed.entries[:4]:
                 title = getattr(entry, "title", "")
                 summary = getattr(entry, "summary", "")
-                full_text = f"{title} {summary}"
-                clean = re.sub(r"<[^>]+>", " ", full_text)
+                clean = re.sub(r"<[^>]+>", " ", f"{title} {summary}")
+                sentiment, score = get_sentiment(clean)
                 entities = extract_entities(clean)
-                raw_articles.append({"headline": title[:140], "source": source, "date": parse_date(entry), "link": getattr(entry, "link", "#"), "entities": entities, "clean": clean})
+                articles.append({"headline": title[:140], "source": source, "date": parse_date(entry), "link": getattr(entry, "link", "#"), "sentiment": sentiment, "score": score, "entities": entities})
+                time.sleep(0.2)
         except:
             continue
-
-    import time
-    for art in raw_articles:
-        try:
-            result = finbert_sentiment([art["clean"][:512]])
-            if result and len(result) > 0:
-                sentiment, score = result[0]
-            else:
-                sentiment, score = score_sentiment(art["clean"])
-        except:
-            sentiment, score = score_sentiment(art["clean"])
-        articles.append({"headline": art["headline"], "source": art["source"], "date": art["date"], "link": art["link"], "entities": art["entities"], "sentiment": sentiment, "score": score})
-        time.sleep(0.3)
-
     return articles
 
 def compute_signal(articles):
@@ -237,7 +219,7 @@ def main():
 
     st.markdown(f"""
     <div class="ticker-wrap">
-        &nbsp;&nbsp;🟢 LIVE &nbsp;·&nbsp; {now} &nbsp;·&nbsp; {len(articles)} articles scanned
+        &nbsp;&nbsp;🟢 LIVE &nbsp;·&nbsp; {now} &nbsp;·&nbsp; {len(articles)} articles scanned &nbsp;·&nbsp; FinBERT AI Scoring
     </div>
     """, unsafe_allow_html=True)
 
@@ -273,7 +255,7 @@ def main():
             <div class="signal-label">{label}</div>
             <div style="font-size:0.8rem; margin-bottom:0.5rem; opacity:0.85;">{advice}</div>
             <div style="font-size:0.7rem; opacity:0.6; margin-bottom:0.5rem;">DRIVEN BY: {driven_by}</div>
-            <div style="opacity:0.5; font-size:0.68rem;">TRADE SIGNAL · AUTO-GENERATED · NOT FINANCIAL ADVICE</div>
+            <div style="opacity:0.5; font-size:0.68rem;">TRADE SIGNAL · FINBERT AI · NOT FINANCIAL ADVICE</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -323,7 +305,7 @@ def main():
     st.markdown("""
     <br><hr class="section-divider">
     <div style="text-align:center; font-family: 'Space Mono', monospace; font-size:0.65rem; color:#333355; padding-bottom:2rem;">
-        NETUNIM · Sentiment Intelligence for Indian Markets · Not Financial Advice
+        NETUNIM · FinBERT AI Sentiment · Indian Markets · Not Financial Advice
     </div>
     """, unsafe_allow_html=True)
 
