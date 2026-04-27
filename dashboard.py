@@ -238,6 +238,7 @@ def main():
     st.markdown("<br>", unsafe_allow_html=True)
 
     nifty_price, nifty_chg, sensex_price, sensex_chg = fetch_market_prices()
+    st_autorefresh = st.empty()
     pc1, pc2 = st.columns(2)
     with pc1:
         if nifty_price:
@@ -284,6 +285,33 @@ def main():
         st.plotly_chart(make_gauge(avg_score), use_container_width=True, config={"displayModeBar": False})
     with col_donut:
         st.plotly_chart(make_donut(bull, bear, neut), use_container_width=True, config={"displayModeBar": False})
+
+
+    st.markdown('<hr class="section-divider"><div class="section-title">Live Chart · Nifty 50</div>', unsafe_allow_html=True)
+    st.components.v1.html("""
+    <div class="tradingview-widget-container" style="height:400px;">
+      <div id="tradingview_nifty" style="height:400px;"></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+      <script type="text/javascript">
+      new TradingView.widget({
+        "width": "100%",
+        "height": 400,
+        "symbol": "NSE:NIFTY",
+        "interval": "5",
+        "timezone": "Asia/Kolkata",
+        "theme": "dark",
+        "style": "1",
+        "locale": "en",
+        "toolbar_bg": "#0a0a0f",
+        "enable_publishing": false,
+        "hide_top_toolbar": false,
+        "hide_legend": false,
+        "save_image": false,
+        "container_id": "tradingview_nifty"
+      });
+      </script>
+    </div>
+    """, height=420)
 
     st.markdown('<hr class="section-divider"><div class="section-title">Sentiment Scatter · All Articles</div>', unsafe_allow_html=True)
     st.plotly_chart(make_timeline(articles), use_container_width=True, config={"displayModeBar": False})
