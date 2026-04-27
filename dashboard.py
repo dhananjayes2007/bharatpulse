@@ -7,16 +7,16 @@ import zoneinfo
 import yfinance as yf
 from datetime import datetime
 
-st.set_page_config(page_title="Netunim | Indian Market Sentiment", page_icon="📡", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="Nethinim | Indian Market Sentiment", page_icon="📡", layout="wide", initial_sidebar_state="collapsed")
 
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap');
 html, body, [class*="css"] { font-family: 'Syne', sans-serif; background-color: #0a0a0f; color: #e8e8f0; }
 .stApp { background-color: #0a0a0f; }
-.netunim-header { text-align: center; padding: 2rem 0 1rem 0; }
-.netunim-title { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 3.2rem; letter-spacing: -1px; background: linear-gradient(135deg, #00ff88 0%, #00ccff 50%, #ff6b6b 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin: 0; }
-.netunim-sub { font-family: 'Space Mono', monospace; font-size: 0.75rem; color: #555577; letter-spacing: 3px; text-transform: uppercase; margin-top: 4px; }
+.nethinim-header { text-align: center; padding: 2rem 0 1rem 0; }
+.nethinim-title { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 3.2rem; letter-spacing: -1px; background: linear-gradient(135deg, #00ff88 0%, #00ccff 50%, #ff6b6b 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin: 0; }
+.nethinim-sub { font-family: 'Space Mono', monospace; font-size: 0.75rem; color: #555577; letter-spacing: 3px; text-transform: uppercase; margin-top: 4px; }
 .signal-card { border-radius: 12px; padding: 1.5rem; margin: 0.5rem 0; font-family: 'Space Mono', monospace; font-size: 0.85rem; }
 .signal-bullish { background: linear-gradient(135deg, #0d2b1a, #0a1f14); border: 1px solid #00ff8844; color: #00ff88; }
 .signal-bearish { background: linear-gradient(135deg, #2b0d0d, #1f0a0a); border: 1px solid #ff6b6b44; color: #ff6b6b; }
@@ -145,7 +145,8 @@ def fetch_all_news():
                 sentiment, score = get_sentiment(clean)
                 entities = extract_entities(clean)
                 if is_india_relevant(clean):
-                    articles.append({"headline": title[:140], "source": source, "date": parse_date(entry), "link": getattr(entry, "link", "#"), "sentiment": sentiment, "score": score, "entities": entities})
+                    summary_raw = re.sub(r"<[^>]+>", " ", summary).strip()[:200]
+                    articles.append({"headline": title[:140], "source": source, "date": parse_date(entry), "link": getattr(entry, "link", "#"), "sentiment": sentiment, "score": score, "entities": entities, "summary": summary_raw})
                 time.sleep(0.2)
         except:
             continue
@@ -211,9 +212,9 @@ def make_timeline(articles):
 
 def main():
     st.markdown("""
-    <div class="netunim-header">
-        <div class="netunim-title">NETUNIM</div>
-        <div class="netunim-sub">Indian Market Sentiment Intelligence · Real-Time</div>
+    <div class="nethinim-header">
+        <div class="nethinim-title">NETHINIM</div>
+        <div class="nethinim-sub">Indian Market Sentiment Intelligence · Real-Time</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -309,6 +310,7 @@ def main():
         <div class="news-card {css}">
             <div class="news-headline"><a href="{art['link']}" target="_blank" style="color:inherit;text-decoration:none;">{art['headline']}</a></div>
             <div class="news-meta">{art['source']} · {art['date']} · 🏷 {art['entities']}</div>
+            <div style="font-size:0.78rem; color:#aaaacc; margin-top:6px; line-height:1.5;">{art.get('summary', '')}</div>
             <span class="news-score {score_css}">{score_label}</span>
         </div>
         """, unsafe_allow_html=True)
@@ -316,7 +318,7 @@ def main():
     st.markdown("""
     <br><hr class="section-divider">
     <div style="text-align:center; font-family: 'Space Mono', monospace; font-size:0.65rem; color:#333355; padding-bottom:2rem;">
-        NETUNIM · FinBERT AI Sentiment · Indian Markets · Not Financial Advice
+        NETHINIM · FinBERT AI Sentiment · Indian Markets · Not Financial Advice
     </div>
     """, unsafe_allow_html=True)
 
